@@ -1,0 +1,113 @@
+module Arche.Tests where
+
+import Daml.Script
+import DA.Date
+import qualified Arche as Contracts
+import qualified Arche.Pledge as Pledge
+
+data Parties = Parties
+  { supplier : Party
+  , buyer : Party
+  , financier : Party
+  , custodian : Party
+  }
+
+initialize : Script ()
+initialize = script do
+  parties <- allocateParties
+  _ <- issueInvoice parties
+  pure ()
+
+testConfirmTwiceFails : Script ()
+testConfirmTwiceFails = script do
+  parties <- allocateParties
+  receivableCid <- issueInvoice parties
+  _ <- confirmInvoice parties receivableCid
+  buyer parties `submitMustFail` do
+    exerciseCmd receivableCid Contracts.Confirm
+  pure ()
+
+testFinanceTwiceFails : Script ()
+testFinanceTwiceFails = script do
+  parties <- allocateParties
+  receivableCid <- issueInvoice parties
+  confirmedCid <- confirmInvoice parties receivableCid
+  _ <- financeInvoice parties confirmedCid
+  receivableCid2 <- issueInvoice parties
+  confirmedCid2 <- confirmInvoice parties receivableCid2
+  submitMultiMustFail [financier parties, custodian parties] [] do
+    exerciseCmd confirmedCid2
+      (Contracts.Finance
+        with
+          financier = financier parties
+          advancePct = 80.0
+          rateBps = 350
+          maturity = addDays today 30
+          custodian = custodian parties)
+  pure ()
+
+testSettlementBeforeMaturityFails : Script ()
+testSettlementBeforeMaturityFails = script do
+  parties <- allocateParties
+  receivableCid <- issueInvoice parties
+  confirmedCid <- confirmInvoice parties receivableCid
+  (agreementCid, _) <- financeInvoice parties confirmedCid
+  buyer parties `submitMustFail` do
+    exerciseCmd agreementCid
+      (Contracts.Settle
+        with
+          paidAmount = 1000.0
+          paidOn = addDays today 10)
+  pure ()
+
+allocateParties : Script Parties
+allocateParties = do
+  supplier <- allocatePartyWithHint "Supplier_A" (PartyIdHint "Supplier_A")
+  buyer <- allocatePartyWithHint "Buyer_B" (PartyIdHint "Buyer_B")
+  financier <- allocatePartyWithHint "Financier_F" (PartyIdHint "Financier_F")
+  custodian <- allocatePartyWithHint "Custodian_C" (PartyIdHint "Custodian_C")
+  pure Parties {..}
+
+issueInvoice : Parties -> Script (ContractId Contracts.ReceivableAsset)
+issueInvoice Parties {..} =
+  submit supplier do
+    createCmd Contracts.ReceivableAsset
+      with
+        receivableId = "INV-001"
+        supplier
+        buyer
+        amount = 1000.00
+        currency = "USD"
+        dueDate = addDays today 30
+        prospectiveFinanciers = [financier]
+
+confirmInvoice
+  : Parties
+ -> ContractId Contracts.ReceivableAsset
+ -> Script (ContractId Contracts.ConfirmedReceivable)
+confirmInvoice Parties {..} receivableCid =
+  submit buyer do
+    exerciseCmd receivableCid Contracts.Confirm
+
+financeInvoice
+  : Parties
+ -> ContractId Contracts.ConfirmedReceivable
+ -> Script ( ContractId Contracts.FinancingAgreement
+           , ContractId Pledge.PledgeRegistry
+           )
+financeInvoice Parties {..} confirmedCid =
+  submitMulti [financier, custodian] [] do
+    exerciseCmd confirmedCid
+      (Contracts.Finance
+        with
+          financier
+          advancePct = 80.0
+          rateBps = 350
+          maturity = addDays today 60
+          custodian)
+
+today : Date
+today = date 2024 Dec 31
+
+
+

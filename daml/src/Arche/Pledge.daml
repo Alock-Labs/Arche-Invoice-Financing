@@ -1,0 +1,44 @@
+module Arche.Pledge where
+
+import DA.Assert
+import DA.List (elem, foldl)
+
+data PledgeStatus = Pledged | Unpledged
+  deriving (Eq, Show)
+
+template PledgeRegistry
+  with
+    custodian : Party
+    receivableId : Text
+    status : PledgeStatus
+    beneficiary : Party
+    observerParties : [Party]
+  where
+    signatory custodian
+    observer (uniqueParties (beneficiary :: observerParties))
+    key (custodian, receivableId) : (Party, Text)
+    maintainer (case key of (owner, _) -> owner)
+
+    choice MarkPledged : ContractId PledgeRegistry
+      controller custodian
+      do
+        assertMsg "Pledge must currently be unpledged" (status == Unpledged)
+        create this with status = Pledged
+
+    choice MarkUnpledged : ContractId PledgeRegistry
+      controller custodian
+      do
+        assertMsg "Pledge must currently be pledged" (status == Pledged)
+        create this with status = Unpledged
+
+statusToText : PledgeStatus -> Text
+statusToText Pledged = "Pledged"
+statusToText Unpledged = "Unpledged"
+
+uniqueParties : [Party] -> [Party]
+uniqueParties =
+  foldl
+    (\acc p -> if elem p acc then acc else acc ++ [p])
+    []
+
+

@@ -1,0 +1,31 @@
+version: '3.9'
+
+services:
+  canton:
+    image: digitalasset/canton-community:2.8.0
+    command: ['daemon', '--config', '/canton/domain.conf']
+    volumes:
+      - ./canton:/canton
+    ports:
+      - '5011:5011'
+      - '5012:5012'
+
+  json-api:
+    image: digitalasset/daml-sdk:2.8.0
+    command:
+      [
+        'daml',
+        'json-api',
+        '--ledger-host',
+        'canton',
+        '--ledger-port',
+        '5011',
+        '--http-port',
+        '7575',
+        '--allow-insecure-tokens'
+      ]
+    depends_on:
+      - canton
+    ports:
+      - '7575:7575'
+

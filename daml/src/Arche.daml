@@ -1,0 +1,178 @@
+module Arche where
+
+import Daml.Script
+import DA.Assert
+import DA.Date
+import DA.Optional
+import DA.List (elem, foldl)
+import Arche.Pledge hiding (uniqueParties)
+
+template ReceivableAsset
+  with
+    receivableId : Text
+    supplier : Party
+    buyer : Party
+    amount : Decimal
+    currency : Text
+    dueDate : Date
+    prospectiveFinanciers : [Party]
+  where
+    signatory supplier
+    observer (uniqueParties (buyer :: prospectiveFinanciers))
+
+    choice Confirm : ContractId ConfirmedReceivable
+      controller buyer
+      do
+        create ConfirmedReceivable
+          with
+            receivableId
+            supplier
+            buyer
+            amount
+            currency
+            dueDate
+            prospectiveFinanciers
+
+template ConfirmedReceivable
+  with
+    receivableId : Text
+    supplier : Party
+    buyer : Party
+    amount : Decimal
+    currency : Text
+    dueDate : Date
+    prospectiveFinanciers : [Party]
+  where
+    signatory buyer
+    observer (uniqueParties (supplier :: prospectiveFinanciers))
+
+    choice Finance :
+        (ContractId FinancingAgreement, ContractId PledgeRegistry)
+      with
+        financier : Party
+        advancePct : Decimal
+        rateBps : Int
+        maturity : Date
+        custodian : Party
+      controller financier, custodian
+      do
+        assertMsg "Financier not approved for this receivable"
+          (financier `elem` prospectiveFinanciers)
+        assertMsg "Advance percent must be between 0 and 100"
+          (advancePct >= 0.0 && advancePct <= 100.0)
+        assertMsg "Maturity must be on or after the invoice due date"
+          (maturity >= dueDate)
+        mbExisting <- lookupByKey @PledgeRegistry (custodian, receivableId)
+        assertMsg "Receivable already pledged" (isNone mbExisting)
+        let
+          principal = amount * advancePct / 100.0
+        assertMsg "Principal must be positive" (principal > 0.0)
+        pledgeCid <-
+          create PledgeRegistry
+            with
+              custodian
+              receivableId
+              status = Pledged
+              beneficiary = financier
+              observerParties = [supplier, buyer]
+        agreementCid <-
+          create FinancingAgreement
+            with
+              receivableId
+              supplier
+              buyer
+              financier
+              principal
+              faceAmount = amount
+              rateBps
+              maturity
+              currency
+              custodian
+              pledgeCid
+              prospectiveFinanciers
+        pure (agreementCid, pledgeCid)
+
+template FinancingAgreement
+  with
+    receivableId : Text
+    supplier : Party
+    buyer : Party
+    financier : Party
+    principal : Decimal
+    faceAmount : Decimal
+    rateBps : Int
+    maturity : Date
+    currency : Text
+    custodian : Party
+    pledgeCid : ContractId PledgeRegistry
+    prospectiveFinanciers : [Party]
+  where
+    signatory financier
+    observer (uniqueParties (supplier :: buyer :: prospectiveFinanciers))
+
+    choice Settle : ContractId SettlementRecord
+      with
+        paidAmount : Decimal
+        paidOn : Date
+      controller buyer
+      do
+        assertMsg "Settlement cannot occur before maturity" (paidOn >= maturity)
+        assertMsg "Paid amount must be at least the face amount" (paidAmount >= faceAmount)
+        settlementCid <-
+          create SettlementRecord
+            with
+              receivableId
+              paidAmount
+              payer = buyer
+              paidTo = financier
+              paidOn
+              supplier
+              buyer
+              financier
+        create PledgeReleaseRequest
+          with
+            custodian
+            financier
+            buyer
+            pledgeCid
+            receivableId
+        pure settlementCid
+
+template SettlementRecord
+  with
+    receivableId : Text
+    paidAmount : Decimal
+    payer : Party
+    paidTo : Party
+    paidOn : Date
+    supplier : Party
+    buyer : Party
+    financier : Party
+  where
+    signatory financier
+    observer supplier, buyer
+
+template PledgeReleaseRequest
+  with
+    custodian : Party
+    financier : Party
+    buyer : Party
+    pledgeCid : ContractId PledgeRegistry
+    receivableId : Text
+  where
+    signatory buyer
+    observer custodian, financier
+
+    choice AckRelease : ContractId PledgeRegistry
+      controller custodian
+      do
+        _ <- exercise pledgeCid MarkUnpledged
+        pure pledgeCid
+
+uniqueParties : [Party] -> [Party]
+uniqueParties =
+  foldl
+    (\acc p -> if elem p acc then acc else acc ++ [p])
+    []
+
+
