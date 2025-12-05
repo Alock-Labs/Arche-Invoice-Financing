@@ -22,6 +22,5 @@ ui/.env.local
 ui/.vite/
 ui/tsconfig.tsbuildinfo
 mock-api/node_modules/
-mock-api/package-lock.json
 
 
