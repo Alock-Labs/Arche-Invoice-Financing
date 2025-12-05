@@ -1,0 +1,25 @@
+# macOS artifacts
+.DS_Store
+
+# IDE/project files
+.idea/
+.vscode/
+npm-debug.log*
+
+# DAML build outputs
+.daml/
+daml/.daml/
+daml/.lib/
+*.dar
+
+# Downloaded tooling
+http-json-*.jar
+
+# UI build artifacts
+ui/node_modules/
+ui/dist/
+ui/.env.local
+ui/.vite/
+ui/tsconfig.tsbuildinfo
+
+

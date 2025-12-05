@@ -1,6 +1,15 @@
 import type { TemplateId } from './types';
 
-const packageId = import.meta.env.VITE_DAML_PACKAGE_ID;
+const normalizePackageId = (value?: string) => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  // Treat placeholder text (e.g. "<replace-with-dar-package-id>") as unset
+  if (trimmed.startsWith('<') && trimmed.endsWith('>')) return undefined;
+  return trimmed;
+};
+
+const packageId = normalizePackageId(import.meta.env.VITE_DAML_PACKAGE_ID);
 
 const buildTemplate = (moduleName: string, entityName: string): TemplateId => {
   if (packageId && packageId.length > 0) {

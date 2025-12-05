@@ -59,7 +59,6 @@ Arche-Invoice-Financing/
 │ │ └─ lib/damlClient.ts
 │ └─ index.html
 ├─ scripts/
-│ ├─ start-canton.sh
 │ ├─ deploy-parties.sh
 │ └─ load-sample.sh
 ├─ docs/
@@ -72,34 +71,65 @@ Arche-Invoice-Financing/
 
 ## Quick Start
 
-### 1. Start Canton + JSON API
-```bash
-./scripts/start-canton.sh
-./scripts/deploy-parties.sh
-```
+1. **Launch Canton (daemon mode)**  
+   Use your downloaded Canton image (or local install) to expose the ledger on ports `5011/5012`. Example:
+   ```bash
+   docker run --rm --platform linux/amd64 \
+     -p 5011:5011 -p 5012:5012 \
+     -v "$(pwd)/scripts/canton:/config" \
+     --entrypoint /canton/bin/canton \
+     digitalasset/canton-community:<tag> \
+     daemon --config /config/domain.conf
+   ```
 
-### 2. Load sample receivable (optional)
-```bash
-./scripts/load-sample.sh
-```
+2. **Start the DAML JSON API**  
+   Download `http-json-2.8.0.jar` from the DAML releases and run:
+   ```bash
+   java -jar http-json-2.8.0.jar \
+     --ledger-host localhost \
+     --ledger-port 5011 \
+     --http-port 7575 \
+     --allow-insecure-tokens
+   ```
 
-### 3. Run the UI
-```bash
-cd ui
-cp env.example .env.local   # update packageId + JWTs if needed
-npm install
-npm run dev
-```
+3. **Allocate parties + JWTs**  
+   ```bash
+   /opt/homebrew/bin/bash ./scripts/deploy-parties.sh
+   ```
+   This updates `ui/.env.local` with `Supplier_A`, `Buyer_B`, `Financier_F`, and `Custodian_C` tokens.
 
-Visit http://localhost:5173 to walk the Supplier → Buyer → Financier flow.
+4. **Build the DAR & capture the package ID**  
+   ```bash
+   cd daml
+   daml build
+   dar=.daml/dist/arche-invoice-financing-0.1.0.dar
+   package_id=$(daml damlc inspect-dar "$dar" | grep -m1 arche-invoice-financing | grep -o '[0-9a-f]\{64\}')
+   ```
+   Set `VITE_DAML_PACKAGE_ID=<package_id>` in `ui/.env.local`.
+
+5. **(Optional) load sample data**  
+   ```bash
+   ./scripts/load-sample.sh
+   ```
+
+6. **Run the UI**  
+   ```bash
+   cd ui
+   npm install
+   npm run dev
+   ```
+
+Visit http://localhost:5173 to walk the Supplier → Buyer → Financier flow (the Vite dev server proxies `/v1` to the JSON API, so there are no CORS issues).
 
 ---
 
 ## Prerequisites
 
-- DAML SDK 2.8.0+
-- Docker Desktop (for Canton + JSON API)
+- DAML SDK / `daml` CLI (2.8.0 tooling for building the DAR)
+- Canton Community distribution (Docker image or local install)
+- Java 11+ (for the JSON API jar)
 - Node.js 18+
+- Bash 4 (macOS users can install via Homebrew for `deploy-parties.sh`)
 
 ---
 

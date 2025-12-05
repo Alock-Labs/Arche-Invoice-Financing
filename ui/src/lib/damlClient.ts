@@ -33,10 +33,10 @@ export class DamlClient {
     query: Record<string, unknown> = {}
   ): Promise<Array<DamlContract<T>>> {
     const payload = {
-      templateIds: [this.cleanTemplateId(templateId)],
+      templateIds: [this.formatTemplateId(templateId)],
       query
     };
-    const response = await this.post<QueryResponse<T>>('/v1/query', payload);
+    const response = await this.post<QueryResponse<T>>('/query', payload);
     return response.result;
   }
 
@@ -45,10 +45,10 @@ export class DamlClient {
     payload: Record<string, unknown>
   ): Promise<DamlContract<T>> {
     const body = {
-      templateId: this.cleanTemplateId(templateId),
+      templateId: this.formatTemplateId(templateId),
       payload
     };
-    const response = await this.post<CreateResponse<T>>('/v1/create', body);
+    const response = await this.post<CreateResponse<T>>('/create', body);
     return response.result;
   }
 
@@ -59,20 +59,18 @@ export class DamlClient {
     argument: Record<string, unknown> = {}
   ): Promise<R> {
     const body = {
-      templateId: this.cleanTemplateId(templateId),
+      templateId: this.formatTemplateId(templateId),
       contractId,
       choice,
       argument
     };
-    const response = await this.post<ExerciseResponse<R>>(
-      '/v1/exercise',
-      body
-    );
+    const response = await this.post<ExerciseResponse<R>>('/exercise', body);
     return response.result.exerciseResult;
   }
 
   private async post<R>(path: string, body: unknown): Promise<R> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const url = this.resolveUrl(path);
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -91,12 +89,31 @@ export class DamlClient {
     return res.json();
   }
 
-  private cleanTemplateId(templateId: TemplateId) {
-    if (!templateId.packageId) {
-      const { packageId: _, ...rest } = templateId;
-      return rest;
+  private resolveUrl(path: string): string {
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    if (!this.baseUrl) {
+      return normalizedPath;
     }
-    return templateId;
+    if (this.baseUrl.startsWith('http')) {
+      const trimmedBase = this.baseUrl.replace(/\/+$/, '');
+      return `${trimmedBase}${normalizedPath}`;
+    }
+    const normalizedBase = this.baseUrl.replace(/\/+$/, '');
+    if (!normalizedBase) {
+      return normalizedPath;
+    }
+    return `${normalizedBase}${normalizedPath}`;
+  }
+
+  private formatTemplateId(templateId: TemplateId): string {
+    const module = templateId.moduleName.trim();
+    const entity = templateId.entityName.trim();
+    if (!module || !entity) {
+      throw new Error('Invalid template identifier');
+    }
+    const pkg = templateId.packageId?.trim();
+    const qualified = `${module}:${entity}`;
+    return pkg ? `${pkg}:${qualified}` : qualified;
   }
 }
 

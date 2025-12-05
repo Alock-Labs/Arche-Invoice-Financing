@@ -6,8 +6,29 @@ interface PartyCredential {
   token?: string;
 }
 
-const baseUrl =
-  import.meta.env.VITE_JSON_API_BASE_URL ?? 'http://localhost:7575';
+const ensureVersionSegment = (value: string) => {
+  const sanitized = value.replace(/\/+$/, '');
+  if (!sanitized) {
+    return '/v1';
+  }
+  return /\/v\d+$/i.test(sanitized) ? sanitized : `${sanitized}/v1`;
+};
+
+const computeBaseUrl = () => {
+  const envBaseRaw = import.meta.env.VITE_JSON_API_BASE_URL ?? '/v1';
+  const envBase = envBaseRaw.trim();
+  if (!envBase) {
+    return '/v1';
+  }
+  if (envBase.startsWith('http')) {
+    return ensureVersionSegment(envBase);
+  }
+  const normalized =
+    envBase === '/' ? '' : envBase.startsWith('/') ? envBase : `/${envBase}`;
+  return ensureVersionSegment(normalized);
+};
+
+const baseUrl = computeBaseUrl();
 
 const credentials: Record<PartyRole, PartyCredential> = {
   supplier: {

@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   canton:
-    image: digitalasset/canton-community:2.8.0
+    image: ghcr.io/digital-asset/canton-community:2.8.0
     command: ['daemon', '--config', '/canton/domain.conf']
     volumes:
       - ./canton:/canton
@@ -11,7 +11,7 @@ services:
       - '5012:5012'
 
   json-api:
-    image: digitalasset/daml-sdk:2.8.0
+    image: ghcr.io/digital-asset/daml-sdk:2.8.0
     command:
       [
         'daml',
