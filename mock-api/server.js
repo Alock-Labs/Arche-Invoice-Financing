@@ -142,7 +142,7 @@ app.post('/v1/exercise', (req, res) => {
     .json({ errors: [`Unsupported mock exercise ${choice} on ${templateId.entityName}`] });
 });
 
-const PORT = process.env.MOCK_JSON_API_PORT || 5757;
+const PORT = process.env.MOCK_JSON_API_PORT || process.env.PORT || 5757;
 app.listen(PORT, () =>
   console.log(`Mock JSON API listening on http://localhost:${PORT}/v1`)
 );
