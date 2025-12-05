@@ -96,7 +96,7 @@ Arche-Invoice-Financing/
    ```bash
    /opt/homebrew/bin/bash ./scripts/deploy-parties.sh
    ```
-   This updates `ui/.env.local` with `Supplier_A`, `Buyer_B`, `Financier_F`, and `Custodian_C` tokens.
+   This updates `ui/.env.local` with `Supplier_A`, `Buyer_B`, `Financier_F`, and `Custodian_C` tokens, and sets `VITE_JSON_API_BASE_URL=/v1` so the Vite dev proxy forwards calls to the JSON API. (For production deployments, override this with a full JSON API URL.)
 
 4. **Build the DAR & capture the package ID**  
    ```bash

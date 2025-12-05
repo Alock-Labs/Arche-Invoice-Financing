@@ -52,7 +52,7 @@ PY
 
 echo "Writing credentials to $ENV_FILE"
 cat >"$ENV_FILE" <<EOF
-VITE_JSON_API_BASE_URL=http://localhost:7575/v1
+VITE_JSON_API_BASE_URL=/v1
 VITE_DAML_PACKAGE_ID=<replace-with-dar-package-id>
 
 EOF
