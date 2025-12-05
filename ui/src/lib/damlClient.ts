@@ -33,7 +33,7 @@ export class DamlClient {
     query: Record<string, unknown> = {}
   ): Promise<Array<DamlContract<T>>> {
     const payload = {
-      templateIds: [this.formatTemplateId(templateId)],
+      templateIds: [this.normalizeTemplateId(templateId)],
       query
     };
     const response = await this.post<QueryResponse<T>>('/query', payload);
@@ -45,7 +45,7 @@ export class DamlClient {
     payload: Record<string, unknown>
   ): Promise<DamlContract<T>> {
     const body = {
-      templateId: this.formatTemplateId(templateId),
+      templateId: this.normalizeTemplateId(templateId),
       payload
     };
     const response = await this.post<CreateResponse<T>>('/create', body);
@@ -59,7 +59,7 @@ export class DamlClient {
     argument: Record<string, unknown> = {}
   ): Promise<R> {
     const body = {
-      templateId: this.formatTemplateId(templateId),
+      templateId: this.normalizeTemplateId(templateId),
       contractId,
       choice,
       argument
@@ -105,15 +105,18 @@ export class DamlClient {
     return `${normalizedBase}${normalizedPath}`;
   }
 
-  private formatTemplateId(templateId: TemplateId): string {
-    const module = templateId.moduleName.trim();
-    const entity = templateId.entityName.trim();
-    if (!module || !entity) {
+  private normalizeTemplateId(templateId: TemplateId): TemplateId {
+    const moduleName = templateId.moduleName?.trim();
+    const entityName = templateId.entityName?.trim();
+    if (!moduleName || !entityName) {
       throw new Error('Invalid template identifier');
     }
+    const normalized: TemplateId = { moduleName, entityName };
     const pkg = templateId.packageId?.trim();
-    const qualified = `${module}:${entity}`;
-    return pkg ? `${pkg}:${qualified}` : qualified;
+    if (pkg) {
+      normalized.packageId = pkg;
+    }
+    return normalized;
   }
 }
 

@@ -121,6 +121,27 @@ Arche-Invoice-Financing/
 
 Visit http://localhost:5173 to walk the Supplier → Buyer → Financier flow (the Vite dev server proxies `/v1` to the JSON API, so there are no CORS issues).
 
+### Mock-only Demo (no Canton required)
+
+If you just need a visual prototype without running Canton/JSON API:
+
+1. Start the mock API:
+   ```bash
+   cd mock-api
+   npm install
+   npm run dev   # serves http://localhost:5757/v1
+   ```
+2. In `ui/.env.local`, set `VITE_JSON_API_BASE_URL=/mock` (this is the default in `env.example`).  
+   The Vite dev server proxies `/mock` to the mock API.
+   You can also set `VITE_JSON_API_MODE=mock` to ensure the UI always uses the mock proxy in development.
+3. Run the UI as usual:
+   ```bash
+   cd ui
+   npm run dev
+   ```
+
+All Supplier/Buyer/Financier interactions will operate on in-memory state within the mock server, giving you a full UI walkthrough without any DAML infrastructure.
+
 ---
 
 ## Prerequisites
@@ -128,7 +149,7 @@ Visit http://localhost:5173 to walk the Supplier → Buyer → Financier flow (t
 - DAML SDK / `daml` CLI (2.8.0 tooling for building the DAR)
 - Canton Community distribution (Docker image or local install)
 - Java 11+ (for the JSON API jar)
-- Node.js 18+
+- Node.js 18+ (UI + mock API)
 - Bash 4 (macOS users can install via Homebrew for `deploy-parties.sh`)
 
 ---
